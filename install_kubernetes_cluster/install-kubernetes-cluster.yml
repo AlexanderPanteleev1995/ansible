@@ -1,0 +1,81 @@
+- hosts: workers
+  become: yes
+  tasks:
+  - name: Swap-Off
+    shell: swapoff -a
+
+  - name: Swap-Off
+    shell: systemctl mask swap.target
+
+  - name: Changes /etc/fstab
+    ansible.builtin.lineinfile:
+      path: /etc/fstab
+      state: absent
+      regexp: 'swap'
+
+  - name: On br_netfilter
+    shell: modprobe br_netfilter
+  
+  - name: On overlay
+    shell: modprobe overlay
+
+  - name: add overlay in modules
+    shell: echo "overlay" >> /etc/modules
+
+  - name: add br_netfilter in modules
+    shell: echo "br_netfilter" >> /etc/modules
+
+  - name: add 1 in ip_forward
+    shell: echo 1 > /proc/sys/net/ipv4/ip_forward
+
+  - name: install packages transport
+    apt:
+      name:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - git
+      state: latest
+
+  - name: add key
+    ansible.builtin.shell: "{{ item }}"
+    loop:
+      - "curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg"
+      - "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list"
+
+  - name: update packages
+    apt:
+      update_cache: yes
+
+  - name: install packages
+    apt:
+      name:
+        - kubelet
+        - kubeadm
+        - kubectl
+      state: latest 
+
+  - name: install cri-o
+    ansible.builtin.shell: "{{ item }}"
+    loop:
+      - "echo 'deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/ /'|sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list"
+      - "echo 'deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/1.24/xUbuntu_22.04/ /'|sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:1.24.list"
+      - "curl -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:1.24/xUbuntu_22.04/Release.key | sudo apt-key add -"
+      - "curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/Release.key | sudo apt-key add -"
+  
+  - name: update packages2
+    apt:
+      update_cache: yes
+
+  - name: install packages2
+    apt:
+      name:
+        - cri-o
+        - cri-o-runc
+      state: latest
+
+  - name: run cri-o
+    ansible.builtin.shell: "{{ item }}"
+    loop:
+      - "systemctl enable crio"
+      - "systemctl start crio"
