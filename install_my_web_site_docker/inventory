@@ -1,4 +1,4 @@
 [web-servers]
-web-server ansible_host=192.168.146.142
+web-server ansible_host=
 
 
